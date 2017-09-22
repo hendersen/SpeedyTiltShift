@@ -16,8 +16,8 @@ public class SpeedyTiltShift {
 
 
 //    Gaussian Function that is used to calculate the each entry of kernel function
-    public static int GaussianResult (int x, int y, float sigma) {
-        int G = (int) ( 1/Math.sqrt(2*Math.PI*sigma*sigma)*Math.exp((-1)*(x*x + y*y)/(2*sigma*sigma)));
+    public static float GaussianResult (int x, int y, float sigma) {
+        float G = (int) ( 1/Math.sqrt(2*Math.PI*sigma*sigma)*Math.exp((-1)*(x*x + y*y)/(2*sigma*sigma)));
         return G;
     }
 
@@ -30,14 +30,16 @@ public class SpeedyTiltShift {
 //    Gaussian blur using weight matrix approach
     public static int Weight_matrix (int r, int y, int x, int[] pixels, int width, float sigma) {
         int p_new = 0;
-        for(int i = r*(-1); i<= r ; i++) {
-            p_new += GaussianResult(i, (-1)*r, sigma)*getPoint(x-r, y+i, pixels, width);
-        }
-        for(int i = r*(-1); i<= r ; i++) {
-            p_new += GaussianResult(i, (-1)*r, sigma)*getPoint(x, y+i, pixels, width);
-        }
-        for(int i = r*(-1); i<= r ; i++) {
-            p_new += GaussianResult(i, (-1)*r, sigma)*getPoint(x+r, y+i, pixels, width);
+        int length=pixels.length;
+        int height=length/width;
+        for( int i=r*(-1); i<=r; i++){
+            if(x+i>=0 && x+i<width){
+                for( int j=r*(-1); j<=r; j++){
+                    if(y+j>=0 && y+j<height){
+                        p_new +=(int)GaussianResult( i, j, sigma)*getPoint(x+i, y+j, pixels, width);
+                    }
+                }
+            }
         }
         return p_new;
     }
@@ -49,18 +51,38 @@ public class SpeedyTiltShift {
         int width=in.getWidth();
         int height=in.getHeight();
 
-        int r_far =(int) Math.max(6, s_far);
-        int r_near = (int) Math.max(6, s_near);
+        int r_far =(int) Math.ceil(6* s_far);
+        int r_near = (int) Math.ceil(6*s_near);
 
         Log.d("TILTSHIFT_JAVA","hey:"+width+","+height);
         int[] pixels = new int[width*height];
         int offset=0;
         int stride = width;
         in.getPixels(pixels,offset,stride,0,0,width,height);
+        int[] BB=new int[width*height];
+        for(int i=0;i<width*height;i++){
+            BB[i]=(pixels[i]&0xff);
+        }
+
+        int[] GG=new int[width*height];
+        for(int i=0;i<width*height;i++){
+            GG[i]=((pixels[i]<<8)&0xff);
+        }
+
+        int[] RR=new int[width*height];
+        for(int i=0;i<width*height;i++){
+            RR[i]=((pixels[i]<<16)&0xff);
+        }
+
+        int[] AA=new int[width*height];
+        for(int i=0;i<width*height;i++){
+            AA[i]=((pixels[i]<<24)&0xff);
+        }
+
         for (int y=0; y<height; y++){
             for (int x = 0; x<width; x++){
-//                // From Google Developer: int color = (A & 0xff) << 24 | (R & 0xff) << 16 | (G & 0xff) << 16 | (B & 0xff);
-//                int p = pixels[y*width+x];
+
+////                // From Google Developer: int color = (A & 0xff) << 24 | (R & 0xff) << 16 | (G & 0xff) << 16 | (B & 0xff);                int p = pixels[y*width+x];
 //                int BB = p & 0xff;
 //                int GG = (p<<8)& 0xff;
 //                int RR = 0xff;//(p<<16)& 0xff; //set red high
@@ -69,23 +91,44 @@ public class SpeedyTiltShift {
 //                pixels[y*width+x] = color;
 
 //                Divide by height and apply according procedure
+
                 if(y <= a0) {
 //                    Apply guassian blur(through weighted sum
-                    Weight_matrix(r_far, y, x, pixels, width, s_far);
+                    BB[y*width+x]=Weight_matrix(r_far, y, x, BB, width, s_far);
+                    GG[y*width+x]=Weight_matrix(r_far, y, x, GG, width, s_far);
+                    RR[y*width+x]=Weight_matrix(r_far, y, x, RR, width, s_far);
+                    AA[y*width+x]=Weight_matrix(r_far, y, x, AA, width, s_far);
+                    int color = (AA[y*width+x] & 0xff) << 24 | (RR[y*width+x] & 0xff) << 16 | (GG[y*width+x] & 0xff) << 8 | (BB[y*width+x] & 0xff);
+                    pixels[y*width+x] = color;
                 }
                 else if(y <= a1) {
 //                   Apply guassian blur(through weighted sum
-                    Weight_matrix(r_far, y, x, pixels, width, s_far*(a1-y)/(a1-a0));
+                    BB[y*width+x]=Weight_matrix(r_far, y, x, BB, width, s_far*(a1-y)/(a1-a0));
+                    GG[y*width+x]=Weight_matrix(r_far, y, x, GG, width, s_far*(a1-y)/(a1-a0));
+                    RR[y*width+x]=Weight_matrix(r_far, y, x, RR, width, s_far*(a1-y)/(a1-a0));
+                    AA[y*width+x]=Weight_matrix(r_far, y, x, AA, width, s_far*(a1-y)/(a1-a0));
+                    int color = (AA[y*width+x] & 0xff) << 24 | (RR[y*width+x] & 0xff) << 16 | (GG[y*width+x] & 0xff) << 8 | (BB[y*width+x] & 0xff);
+                    pixels[y*width+x] = color;
                 }
                 else if(y <= a2) {
 //                    No nlur
                 }
                 else if(y <= a3) {
-                    Weight_matrix(r_near, y, x, pixels, width, s_far*(y-a2)/(a3-a2));
+                    BB[y*width+x]=Weight_matrix(r_far, y, x, BB, width, s_far*(y-a2)/(a3-a2));
+                    GG[y*width+x]=Weight_matrix(r_far, y, x, GG, width, s_far*(y-a2)/(a3-a2));
+                    RR[y*width+x]=Weight_matrix(r_far, y, x, RR, width, s_far*(y-a2)/(a3-a2));
+                    AA[y*width+x]=Weight_matrix(r_far, y, x, AA, width, s_far*(y-a2)/(a3-a2));
+                    int color = (AA[y*width+x] & 0xff) << 24 | (RR[y*width+x] & 0xff) << 16 | (GG[y*width+x] & 0xff) << 8 | (BB[y*width+x] & 0xff);
+                    pixels[y*width+x] = color;
                 }
                 else {
 //                     Apply guassian blur(through weighted sum
-                    Weight_matrix(r_near, y, x, pixels, width, s_near);
+                    BB[y*width+x]=Weight_matrix(r_far, y, x, BB, width, s_near);
+                    GG[y*width+x]=Weight_matrix(r_far, y, x, GG, width, s_near);
+                    RR[y*width+x]=Weight_matrix(r_far, y, x, RR, width, s_near);
+                    AA[y*width+x]=Weight_matrix(r_far, y, x, AA, width, s_near);
+                    int color = (AA[y*width+x] & 0xff) << 24 | (RR[y*width+x] & 0xff) << 16 | (GG[y*width+x] & 0xff) << 8 | (BB[y*width+x] & 0xff);
+                    pixels[y*width+x] = color;
                 }
             }
         }
