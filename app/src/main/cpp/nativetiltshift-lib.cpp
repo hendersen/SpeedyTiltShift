@@ -4,6 +4,7 @@
 #include <math.h>
 using namespace std;
 extern "C" {
+
 JNIEXPORT jintArray JNICALL
 Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShift(JNIEnv *env,
                                                                     jobject This,
@@ -32,7 +33,9 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
     jint *pixels = env->GetIntArrayElements(pixels_, NULL);
     long length = env->GetArrayLength(pixels_);
     jintArray pixelsOut = env->NewIntArray(length);
-        float32_t arrayIn[length];
+    env->SetIntArrayRegion(pixelsOut, 0, length, pixels);
+
+    float32_t arrayIn[length];
     float32_t arrayOut[length];
 
     for(int i=0;i<length; i++){
@@ -81,7 +84,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
                     weight[m*r+n]=exp(-(m*m+n*n)/(2*sig*sig))/(2*3.14*sig*sig);
                 }
             }
-            for(int a=mid;a<size;a++) {
+            for(int a=mid;a<size&&a+j-mid<arrlen;a++) {
                 temp0=vmla_f32(temp0,AA[j+a-mid],weight[a]);
                 temp1=vmla_f32(temp1,RR[j+a-mid],weight[a]);
                 temp2=vmla_f32(temp2,GG[j+a-mid],weight[a]);
@@ -115,7 +118,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
                     weight[m*r+n]=exp(-(m*m+n*n)/(2*sig*sig))/(2*3.14*sig*sig);
                 }
             }
-            for(int a=mid;a<size;a++) {
+            for(int a=mid;a<size&&a+j-mid<arrlen;a++) {
                 temp0=vmla_f32(temp0,AA[j+a-mid],weight[a]);
                 temp1=vmla_f32(temp1,RR[j+a-mid],weight[a]);
                 temp2=vmla_f32(temp2,GG[j+a-mid],weight[a]);
@@ -156,7 +159,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
                     weight[m*r+n]=exp(-(m*m+n*n)/(2*sig*sig))/(2*3.14*sig*sig);
                 }
             }
-            for(int a=mid;a<size;a++) {
+            for(int a=mid;a<size&&a+j-mid<arrlen;a++) {
                 temp0=vmla_f32(temp0,AA[j+a-mid],weight[a]);
                 temp1=vmla_f32(temp1,RR[j+a-mid],weight[a]);
                 temp2=vmla_f32(temp2,GG[j+a-mid],weight[a]);
@@ -190,7 +193,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
                     weight[m*r+n]=exp(-(m*m+n*n)/(2*sig*sig))/(2*3.14*sig*sig);
                 }
             }
-            for(int a=mid;a<size;a++) {
+            for(int a=mid;a<size&&a+j-mid<arrlen;a++) {
                 temp0=vmla_f32(temp0,AA[j+a-mid],weight[a]);
                 temp1=vmla_f32(temp1,RR[j+a-mid],weight[a]);
                 temp2=vmla_f32(temp2,GG[j+a-mid],weight[a]);
@@ -209,15 +212,14 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
         }
 
     }
+    jint *h=new jint[length];
+    for(int i=0;i<length;i++){
+        h[i]=(jint)arrayOut[i];
+    }
+
+    env->SetIntArrayRegion(pixelsOut,0,length,h);
 
 
-    
-
-  
-  
-  
-    env->SetIntArrayRegion(pixelsOut, 0, length, pixels);
-    
     env->ReleaseIntArrayElements(pixels_, pixels, 0);
     return pixelsOut;
 }
