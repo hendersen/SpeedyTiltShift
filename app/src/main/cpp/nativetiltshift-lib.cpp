@@ -23,7 +23,6 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShift(JNIEnv *env,
 }
 
 JNIEXPORT jintArray JNICALL
-JNIEXPORT jintArray JNICALL
 Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *env,
                                                                     jobject This,
                                                                     jintArray pixels_,
@@ -38,7 +37,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
     jintArray pixelsOut = env->NewIntArray(length);
     env->SetIntArrayRegion(pixelsOut, 0, length, pixels);
 
-    uint8_t arrayIn[length];
+    int32_t arrayIn[length];
 
 
 
@@ -61,7 +60,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
     jfloat sig=0;
 
 
-    for(int j=0;j<arrlen;j++){
+    for(int j=0;j<length;j++){
 
         float32x4_t sum_vecA = vdupq_n_f32(0);
         float32x4_t sum_vecR = vdupq_n_f32(0);
@@ -69,35 +68,35 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
         float32x4_t sum_vecB = vdupq_n_f32(0);
 
 
-        if(j<=(a0*width/4)){
+        if(j<=(a0*width)){
             sig=s_far;
             if(sig<0.7){
                 continue;
             }
         }
 
-        if((a0*width/4)<j&&j<=(a1*width/4)){
-            int len=floor(4*j/width);
+        if((a0*width)<j&&j<=(a1*width)){
+            int len=floor(j/width);
             sig=s_far*((a1-len)/(a1-a0));
             if(sig<0.7){
                 continue;
             }
         }
 
-        if((a1*width/4)<j&&j<=(a2*width/4)){
+        if((a1*width)<j&&j<=(a2*width)){
             continue;
         }
 
-        if((a2*width/4)<j&&j<=(a3*width/4)){
-            int len=floor(4*j/width);
+        if((a2*width)<j&&j<=(a3*width)){
+            int len=floor(j/width);
             sig=s_near*((len-a2)/(a3-a2));
             if(sig<0.7){
                 continue;
             }
         }
 
-        if((a3*width/4)<j){
-            sig=s_far;
+        if((a3*width)<j){
+            sig=s_near;
             if(sig<0.7){
                 continue;
             }
@@ -106,11 +105,24 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
         int r=ceil(3*sig);
         int size=(2*r+1)*(2*r+1);
 
+
+        float32_t weightlane[2*r+1];
+
+        for(int i=0;i<2*r+1;i++){
+            float ii=(float)i;
+            float rr=(float)r;
+            weightlane[i]=(float) exp(-(ii-rr)*(ii-rr)/(2*sig*sig))/sqrt(6.28*sig*sig);
+        }// construct lane weight matrix
+
+
+
         float32_t weight[size];
         float32_t imageA[size];
         float32_t imageR[size];
         float32_t imageG[size];
         float32_t imageB[size];
+
+
 
         for(int m=0;m<2*r+1;m++){
             for(int n=0;n<2*r+1;n++){
@@ -122,16 +134,17 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
 
         float32_t * weightPtr=(float32_t *)weight;
 
-        int loc_x=4*j%width;
-        int loc_y=floor(4*j/width);
+        int loc_x=j%width;
+        int loc_y=floor(j/width);
 
 
 
         for(int n=0;n<2*r+1;n++){
             for(int m=0;m<2*r+1;m++){
-                if(loc_x-4*r+4*m<0||loc_x-4*r+4*m>width) {
+                if(loc_x-r+m<0||loc_x-r+m>width) {
 
                         imageA[n*(2*r+1)+m]=0;
+
                         imageR[n*(2*r+1)+m]=0;
                         imageG[n*(2*r+1)+m]=0;
                         imageB[n*(2*r+1)+m]=0;
@@ -144,10 +157,10 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
                         imageG[n*(2*r+1)+m]=0;
                         imageB[n*(2*r+1)+m]=0;
                     }else{
-                        imageA[n*(2*r+1)+m]=arrayIn[(loc_y-r+n)*width+(loc_x-4*r+4*m)];
-                        imageR[n*(2*r+1)+m]=arrayIn[(loc_y-r+n)*width+(loc_x-4*r+4*m)+1];
-                        imageG[n*(2*r+1)+m]=arrayIn[(loc_y-r+n)*width+(loc_x-4*r+4*m)+2];
-                        imageB[n*(2*r+1)+m]=arrayIn[(loc_y-r+n)*width+(loc_x-4*r+4*m)+3];
+                        imageA[n*(2*r+1)+m]=(float)((arrayIn[(loc_y-r+n)*width+(loc_x-r+m)]>>24)&0xff);
+                        imageR[n*(2*r+1)+m]=(float)((arrayIn[(loc_y-r+n)*width+(loc_x-r+m)]>>16)&0xff);
+                        imageG[n*(2*r+1)+m]=(float)((arrayIn[(loc_y-r+n)*width+(loc_x-r+m)]>>8)&0xff);
+                        imageB[n*(2*r+1)+m]=(float)((arrayIn[(loc_y-r+n)*width+(loc_x-r+m)])&0xff);
                     }
 
                 }
@@ -193,6 +206,7 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
         sumA +=vgetq_lane_f32(sum_vecA,2);
         sumA +=vgetq_lane_f32(sum_vecA,3);
 
+
         sumR +=vgetq_lane_f32(sum_vecR,0);
         sumR +=vgetq_lane_f32(sum_vecR,1);
         sumR +=vgetq_lane_f32(sum_vecR,2);
@@ -206,19 +220,23 @@ Java_meteor_asu_edu_speedytiltshift_SpeedyTiltShift_nativeTiltShiftNeon(JNIEnv *
         sumB +=vgetq_lane_f32(sum_vecB,0);
         sumB +=vgetq_lane_f32(sum_vecB,1);
         sumB +=vgetq_lane_f32(sum_vecB,2);
-        sumB +=vgetq_lane_f32(sum_vecB,3);//calculate A,R,G,B distribute
+        sumB +=vgetq_lane_f32(sum_vecB,3);
 
 
+        uint8_t finalA=(uint8_t)sumA;
+        uint8_t finalR=(uint8_t)sumR;
+        uint8_t finalG=(uint8_t)sumG;
+        uint8_t finalB=(uint8_t)sumB;
 
-            h[j*4]=(jint)sumA;
-            h[j*4+1]=(jint)sumR;
-            h[j*4+2]=(jint)sumG;
-            h[j*4+3]=(jint)sumB;
+        h[j]=(finalA&0xff)<<24|(finalR&0xff)<<16|(finalG&0xff)<<8|(finalB&0xff);
 
     }
 
 
-    env->SetIntArrayRegion(pixelsOut,0,length,h);
+
+
+   env->SetIntArrayRegion(pixelsOut,0,length,h);
     return pixelsOut;
+
 }
 }
